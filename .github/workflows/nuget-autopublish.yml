@@ -2,9 +2,8 @@ name: nuget-autopublish-on-commit
 
 on:
   push:
-    branches:
-      - master
-  workflow_dispatch: {}
+    branches: [ master ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -70,18 +69,15 @@ jobs:
         if: ${{ steps.ver.outputs.found == 'true' }}
         run: |
           mkdir -p artifacts
-          mapfile -t projects < <(git ls-files '*.csproj')
-          if [[ ${#projects[@]} -eq 0 ]]; then
-            echo "No .csproj files found in repository." >&2
+          # CHANGE THIS to your csproj path
+          PROJECT="src/MyLib/MyLib.csproj"
+          if [[ ! -f "$PROJECT" ]]; then
+            echo "Project not found: $PROJECT" >&2
             exit 1
           fi
-
-          for p in "${projects[@]}"; do
-            echo "Packing $p ..."
-            dotnet pack "$p" -c Release --no-build \
-              -p:PackageVersion="${{ steps.ver.outputs.version }}" \
-              -o ./artifacts
-          done
+          dotnet pack "$PROJECT" -c Release --no-build \
+            -p:PackageVersion="${{ steps.ver.outputs.version }}" \
+            -o ./artifacts
 
       - name: Create & push git tag v<version>
         if: ${{ steps.ver.outputs.found == 'true' }}
@@ -98,12 +94,7 @@ jobs:
         if: ${{ steps.ver.outputs.found == 'true' }}
         run: |
           shopt -s nullglob
-          files=(artifacts/*.nupkg)
-          if [[ ${#files[@]} -eq 0 ]]; then
-            echo "No .nupkg found in ./artifacts" >&2
-            exit 1
-          fi
-          for pkg in "${files[@]}"; do
+          for pkg in artifacts/*.nupkg; do
             echo "Pushing $pkg ..."
             dotnet nuget push "$pkg" \
               --api-key "${{ secrets.NUGET_API_KEY }}" \
