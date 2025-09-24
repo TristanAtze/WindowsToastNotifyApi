@@ -105,12 +105,6 @@ Toast.Activated += args =>
 
 ---
 
-## 📸 Screenshot (Example)
-
-*(insert your screenshot of a sample toast here)*
-
----
-
 ## ⚠️ Notes & Limitations
 
 * Win32 apps require a **Start Menu shortcut** with **AppUserModelID** → handled by `Toast.Initialize`.
