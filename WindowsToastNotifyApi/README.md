@@ -1,138 +1,132 @@
-﻿# WindowsToastApi
+# MauiToastNotifyApi
 
-Simple, Win32-friendly **Windows Toast Notification** API for .NET apps (Console, WPF, WinForms) on Windows 10/11.  
-Built on top of [CommunityToolkit.WinUI.Notifications](https://www.nuget.org/packages/CommunityToolkit.WinUI.Notifications).
+Cross-platform toast/local notification helper for .NET MAUI and MAUI Blazor Hybrid apps. Ships a single API that lights up native notifications on Windows, Android, iOS, MacCatalyst and falls back to `notify-send` or console output on desktop Linux.
 
 ---
 
 ## ✨ Features
 
-- ✅ Show toast notifications from **Console, WinForms, WPF** (Win32) apps  
-- ✅ One-line `Toast.Info/Success/Warning/Error` presets  
-- ✅ Custom buttons, payload, hero images, app logos  
-- ✅ Activation callback with arguments and user input  
-- ✅ Handles **AppUserModelID + Start Menu shortcut** automatically  
-- ✅ Includes XML docs, SourceLink, symbols (`.snupkg`)
+- ✅ Single `Toast` API usable from .NET MAUI, MAUI Blazor Hybrid, and classic Windows apps
+- ✅ Windows implementation keeps CommunityToolkit-powered hero images, buttons, payload + activation callbacks
+- ✅ Android uses native notification channels & icons (auto creates channel on first init)
+- ✅ iOS/MacCatalyst schedule `UNUserNotificationCenter` alerts and surface activation callbacks
+- ✅ Linux/Generic .NET hosts fall back to `notify-send` (if present) or console log
+- ✅ Helpers for `Toast.Info/Success/Warning/Error` presets and shared `ToastOptions`
 
 ---
 
 ## 📦 Install
 
 ```powershell
-dotnet add package WindowsToastApi
-````
+dotnet add package MauiToastNotifyApi
+```
 
-> Requires `net8.0-windows10.0.19041.0` or higher.
+> Targets `net8.0-windows10.0.19041.0`, `net8.0-android`, `net8.0-ios`, `net8.0-maccatalyst`, and `net8.0` (fallback/Linux).
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (.NET MAUI)
+
+Call `Toast.Initialize` once after the MAUI app is built (for Windows the AppUserModelID doubles as the notification channel id on Android):
 
 ```csharp
-using WindowsToastApi;
+// MauiProgram.cs
+using WindowsToastNotifyApi; // Namespace kept for backwards compatibility
 
-// 1. Initialize once at app startup
-Toast.Initialize(
-    appId: "YourCompany.YourApp",
-    displayName: "Your App",
-    iconPath: null);
-
-// 2. Optional: subscribe to activation callback
-Toast.Activated += args =>
+public static MauiApp CreateMauiApp()
 {
-    Console.WriteLine($"Activated: {args.Arguments}");
-    foreach (var kv in args.Payload)
-        Console.WriteLine($"{kv.Key}={kv.Value}");
-};
+    var builder = MauiApp.CreateBuilder();
+    builder
+        .UseMauiApp<App>()
+        .ConfigureFonts(fonts => fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"));
 
-// 3. Show presets
-Toast.Info("Hello", "This is an info toast");
-Toast.Success("Backup complete", "All files synced");
-Toast.Warning("High CPU", "Process using 92%");
-Toast.Error("Service crashed", "EventLogWatcher stopped");
+    var app = builder.Build();
 
-// 4. Show toast with buttons & payload
+    Toast.Initialize(
+        appId: "com.company.myapp",  // Windows AppUserModelID / Android channel id
+        displayName: "My App",
+        iconPath: null);              // Optional Windows .ico/.png absolute path
+
+    return app;
+}
+```
+
+Trigger notifications anywhere after initialization:
+
+```csharp
+// e.g. inside a Page/ViewModel command
+Toast.Success("Backup complete", "All files synced to the cloud.");
+
 Toast.Show("Deploy ready", "Promote to production?",
     new ToastOptions
     {
-        PrimaryButton = ("Deploy now", "deploy"),
+        PrimaryButton = ("Deploy now", "deploy"),  // Windows buttons only
         SecondaryButton = ("Later", "later"),
-        Payload = new Dictionary<string,string> { ["pipelineId"] = "a1b2c3" },
-        Duration = ToastDuration.Long
+        Payload = new Dictionary<string, string> { ["pipelineId"] = "a1b2c3" }
     });
 ```
 
+For Win32 console/WPF/WinForms the usage stays unchanged.
+
 ---
 
-## 🔧 API Overview
-
-### `Toast.Initialize(string appId, string displayName, string? iconPath = null)`
-
-* Must be called **once** before showing toasts.
-* Creates a Start Menu shortcut with the given **AppUserModelID**.
-
-### `Toast.Show(string title, string message, ToastOptions? options = null)`
-
-* Show a custom toast with text, optional images, buttons, payload.
-
-### Presets
-
-* `Toast.Info(string title, string message, ToastOptions? options = null)`
-* `Toast.Success(...)`
-* `Toast.Warning(...)`
-* `Toast.Error(...)`
-
-### Activation
+## 🔄 Activation Callback
 
 ```csharp
 Toast.Activated += args =>
 {
-    Console.WriteLine(args.Arguments);
+    Console.WriteLine($"Arguments: {args.Arguments}");
     foreach (var kv in args.Payload)
         Console.WriteLine($"{kv.Key}={kv.Value}");
 };
 ```
 
-### `ToastOptions`
-
-* `HeroImagePath` → large hero image
-* `AppLogoOverridePath` → circle app logo
-* `Silent` → mute sound
-* `Duration` → `Short` or `Long`
-* `Scenario` → `Default`, `Alarm`, `Reminder`, `IncomingCall`
-* `PrimaryButton` / `SecondaryButton` → `(content, arguments)`
-* `Payload` → dictionary returned on activation
+| Platform          | Activation Support                             |
+| ----------------- | ---------------------------------------------- |
+| Windows           | ✅ via CommunityToolkit + Start Menu shortcut  |
+| iOS / MacCatalyst | ✅ via `UNUserNotificationCenter` response     |
+| Android           | ⚠️ Launches the app; explicit callbacks TBD    |
+| Linux / net8.0    | ❌ (console/log only)                          |
 
 ---
 
-## 📸 Screenshot (Example)
+## 🧰 ToastOptions Cheat Sheet
 
-*(insert your screenshot of a sample toast here)*
+| Option                    | Windows | Android | iOS/Mac | Linux |
+| ------------------------- | :-----: | :-----: | :-----: | :---: |
+| `HeroImagePath`           | ✅      | ❌      | ❌      | ❌    |
+| `AppLogoOverridePath`     | ✅      | ❌      | ❌      | ❌    |
+| `Silent`                  | ⚠️ (ignored on Toolkit 7.1.2) | ✅ | ✅ | ❌ |
+| `Duration`                | ✅      | ❌      | ❌      | ❌    |
+| `Primary/SecondaryButton` | ✅      | ❌      | ❌      | ❌    |
+| `Payload`                 | ✅      | ✅ (intent extras) | ✅ | ❌ |
+
+> Options that are not supported on a platform are safely ignored.
 
 ---
 
-## ⚠️ Notes & Limitations
+## 📝 Platform Notes
 
-* Win32 apps require a **Start Menu shortcut** with **AppUserModelID** → handled by `Toast.Initialize`.
-* Works only in **interactive user sessions** (not background Windows Services).
-* Images/icons must be **absolute file paths** or `file:///` URIs.
-* Windows may throttle notifications if spamming.
+- **Windows**: still creates an AppUserModelID shortcut under Start → Programs if missing. Buttons & activation payloads work as before.
+- **Android**: uses the MAUI `Platform.AppContext`; make sure `MauiProgram.CreateMauiApp` runs before calling `Toast.Initialize`. Notifications reuse the application icon.
+- **iOS/MacCatalyst**: requests notification permissions on first initialization and hooks `UNUserNotificationCenter.Current.Delegate` to raise `Toast.Activated`.
+- **Linux / net8.0**: tries to execute `notify-send`. If the binary is not available it falls back to `Console.WriteLine`.
 
 ---
 
 ## 🛠 Development
 
-Clone and build locally:
-
 ```bash
-git clone https://github.com/BenSowieja/WindowsToastApi.git
-cd WindowsToastApi
-dotnet build -c Release
-dotnet pack src/WindowsToastApi/WindowsToastApi.csproj -c Release -o out
+# Windows only shortcut creation still requires an interactive user
+# Build the Windows target (other targets require the matching workloads)
+dotnet build WindowsToastNotifyApi/WindowsToastNotifyApi.csproj -f net8.0-windows10.0.19041.0
 ```
+
+> Android/iOS/MacCatalyst builds require the corresponding .NET MAUI workloads to be installed on your machine.
 
 ---
 
 ## 📄 License
 
 [MIT](LICENSE) © 2025 Ben Sowieja
+

@@ -1,99 +1,54 @@
-﻿using CommunityToolkit.WinUI.Notifications; // ToastContentBuilder, ToastButton, ToastNotificationManagerCompat
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using Windows.UI.Notifications;             // ToastNotification
-
 namespace WindowsToastNotifyApi;
 
 /// <summary>
-/// Entry point for showing Windows Toast notifications from Win32/.NET apps.
-/// Works with CommunityToolkit.WinUI.Notifications 7.1.2.
+/// Cross-platform toast/notification entry point. Platform-specific implementations
+/// live in partial class files (e.g. Toast.Windows.cs, Toast.Android.cs, ...).
 /// </summary>
-public static class Toast
+public static partial class Toast
 {
+    private static bool _initialized;
     private static string? _appId;
     private static string? _displayName;
     private static string? _iconPath;
-    private static bool _initialized;
-
-    public static event Action<ToastActivationArgs>? Activated;
 
     /// <summary>
-    /// Initialize once. Creates Start Menu shortcut with the AppUserModelID so toasts show for Win32 apps.
+    /// Raised when the user activates a toast (only supported on platforms that expose activation payloads).
     /// </summary>
+    public static event Action<ToastActivationArgs>? Activated;
+
+    internal static string? AppId => _appId;
+    internal static string? DisplayName => _displayName;
+    internal static string? IconPath => _iconPath;
+
+    /// <summary>
+    /// Indicates whether <see cref="Initialize"/> has been called for the current process.
+    /// </summary>
+    public static bool IsInitialized => _initialized;
+
+    /// <summary>
+    /// Call once during app start to set up platform specific notification infrastructure.
+    /// </summary>
+    /// <param name="appId">Unique application identifier. On some platforms this maps to a notification channel id.</param>
+    /// <param name="displayName">Human readable application name.</param>
+    /// <param name="iconPath">Optional app icon resource/asset path. Usage depends on the platform.</param>
     public static void Initialize(string appId, string displayName, string? iconPath = null)
     {
         _appId = appId ?? throw new ArgumentNullException(nameof(appId));
         _displayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
         _iconPath = iconPath;
 
-        EnsureStartMenuShortcut(appId, displayName, iconPath);
-
-        // Wire activation
-        ToastNotificationManagerCompat.OnActivated += e =>
-        {
-            var payload = e.UserInput?.ToDictionary(kv => kv.Key, kv => kv.Value?.ToString() ?? "")
-                          ?? new Dictionary<string, string>();
-
-            var args = new ToastActivationArgs
-            {
-                Arguments = e.Argument ?? string.Empty,
-                Payload = payload
-            };
-
-            Activated?.Invoke(args);
-        };
+        PlatformInitialize(appId, displayName, iconPath);
 
         _initialized = true;
     }
 
+    /// <summary>
+    /// Shows a toast/notification with the given content.
+    /// </summary>
     public static void Show(string title, string message, ToastOptions? options = null)
     {
         EnsureInitialized();
-
-        var builder = new ToastContentBuilder()
-            .AddText(title)
-            .AddText(message);
-
-        if (!string.IsNullOrWhiteSpace(options?.HeroImagePath))
-            builder.AddHeroImage(new Uri(options!.HeroImagePath!));
-
-        if (!string.IsNullOrWhiteSpace(options?.AppLogoOverridePath))
-            builder.AddAppLogoOverride(new Uri(options!.AppLogoOverridePath!), ToastGenericAppLogoCrop.Circle);
-
-        if (options?.PrimaryButton is { } p)
-            builder.AddButton(new ToastButton()
-                .SetContent(p.content)
-                .AddArgument("action", p.arguments ?? "primary"));
-
-        if (options?.SecondaryButton is { } s)
-            builder.AddButton(new ToastButton()
-                .SetContent(s.content)
-                .AddArgument("action", s.arguments ?? "secondary"));
-
-        if (options?.Payload is { Count: > 0 })
-        {
-            foreach (var kv in options.Payload)
-                builder.AddArgument(kv.Key, kv.Value);
-        }
-
-        // Duration is supported in 7.1.2
-        var duration = options?.Duration == ToastDuration.Long
-            ? CommunityToolkit.WinUI.Notifications.ToastDuration.Long
-            : CommunityToolkit.WinUI.Notifications.ToastDuration.Short;
-
-        builder.SetToastDuration(duration);
-
-        // NOTE:
-        // - Scenario is not set because builder API for scenario isn't available in 7.1.2.
-        // - Silent is not set because AddSilent() does not exist in 7.1.2.
-
-        var content = builder.GetToastContent();
-        var toast = new ToastNotification(content.GetXml());
-
-        // In 7.1.2 the compat notifier has no overload with appId. Use CreateToastNotifier().
-        // The AppUserModelID is taken from the Start Menu shortcut created in Initialize().
-        ToastNotificationManagerCompat.CreateToastNotifier().Show(toast);
+        PlatformShow(title, message, options);
     }
 
     public static void Info(string title, string message, ToastOptions? options = null)
@@ -108,35 +63,15 @@ public static class Toast
     public static void Error(string title, string message, ToastOptions? options = null)
         => Show($"🛑 {title}", message, options);
 
+    internal static void RaiseActivated(ToastActivationArgs args)
+        => Activated?.Invoke(args);
+
     private static void EnsureInitialized()
     {
         if (!_initialized)
-            throw new InvalidOperationException("Call Toast.Initialize(appId, displayName) once before showing notifications.");
+            throw new InvalidOperationException("Call Toast.Initialize(appId, displayName) before showing notifications.");
     }
 
-    /// <summary>
-    /// Create a Start Menu shortcut with AppUserModelID so Win32 toasts are attributed to your app.
-    /// </summary>
-    private static void EnsureStartMenuShortcut(string appId, string displayName, string? iconPath)
-    {
-        var programs = Environment.GetFolderPath(Environment.SpecialFolder.StartMenu);
-        var shortcutPath = Path.Combine(programs, "Programs", $"{displayName}.lnk");
-
-        if (File.Exists(shortcutPath))
-            return;
-
-        // Target = aktueller Prozess
-        var exePath = Process.GetCurrentProcess().MainModule!.FileName!;
-        var workDir = AppContext.BaseDirectory;
-
-        ShellLinkHelper.CreateShortcutWithAppId(
-            shortcutPath: shortcutPath,
-            targetPath: exePath,
-            arguments: "",
-            workingDirectory: workDir,
-            description: displayName,
-            iconPath: iconPath,
-            appUserModelId: appId
-        );
-    }
+    static partial void PlatformInitialize(string appId, string displayName, string? iconPath);
+    static partial void PlatformShow(string title, string message, ToastOptions? options);
 }

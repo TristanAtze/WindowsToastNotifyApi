@@ -1,14 +1,13 @@
-﻿using System;
+#if WINDOWS
+using System;
 using System.Runtime.InteropServices;
 
 namespace WindowsToastNotifyApi;
 
-// CLSID_ShellLink
 [ComImport]
 [Guid("00021401-0000-0000-C000-000000000046")]
 internal class CShellLink { }
 
-// IShellLinkW
 [ComImport]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 [Guid("000214F9-0000-0000-C000-000000000046")]
@@ -34,7 +33,6 @@ internal interface IShellLinkW
     int SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
 }
 
-// IPropertyStore
 [ComImport]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 [Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
@@ -47,25 +45,25 @@ internal interface IPropertyStore
     int Commit();
 }
 
-// PROPERTYKEY
 [StructLayout(LayoutKind.Sequential, Pack = 4)]
 internal struct PropertyKey
 {
     public Guid fmtid;
     public uint pid;
 
-    public PropertyKey(Guid fmtid, uint pid) { this.fmtid = fmtid; this.pid = pid; }
+    public PropertyKey(Guid fmtid, uint pid)
+    {
+        this.fmtid = fmtid;
+        this.pid = pid;
+    }
 
-    // PKEY_AppUserModel_ID = {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}, 5
     public static PropertyKey AppUserModel_ID => new PropertyKey(
         new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), 5);
 }
 
-// PROPVARIANT (string)
 [StructLayout(LayoutKind.Sequential)]
 internal sealed class PropVariant : IDisposable
 {
-    // VARIANT type codes
     private ushort vt;
     private ushort wReserved1, wReserved2, wReserved3;
     private IntPtr ptr;
@@ -121,3 +119,4 @@ internal enum VarEnum : ushort
     VT_UINT = 23,
     VT_LPWSTR = 31,
 }
+#endif

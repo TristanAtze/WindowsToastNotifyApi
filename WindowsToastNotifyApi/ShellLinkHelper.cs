@@ -1,9 +1,8 @@
-﻿using System;
+#if WINDOWS
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.Versioning;
-using Windows.Foundation.Collections;
 
 namespace WindowsToastNotifyApi;
 
@@ -19,10 +18,8 @@ internal static class ShellLinkHelper
         string? iconPath,
         string appUserModelId)
     {
-        // COM: IShellLinkW
         var shellLink = (IShellLinkW)new CShellLink();
 
-        // Pfad/Args/WD/Beschreibung setzen
         Marshal.ThrowExceptionForHR(shellLink.SetPath(targetPath));
         Marshal.ThrowExceptionForHR(shellLink.SetArguments(arguments ?? string.Empty));
         if (!string.IsNullOrWhiteSpace(workingDirectory))
@@ -32,7 +29,6 @@ internal static class ShellLinkHelper
         if (!string.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath))
             Marshal.ThrowExceptionForHR(shellLink.SetIconLocation(iconPath, 0));
 
-        // IPropertyStore abfragen und PKEY_AppUserModel_ID setzen
         var propertyStore = (IPropertyStore)shellLink;
 
         using var pv = PropVariant.FromString(appUserModelId);
@@ -40,9 +36,8 @@ internal static class ShellLinkHelper
         Marshal.ThrowExceptionForHR(propertyStore.SetValue(ref pkeyAppId, pv));
         Marshal.ThrowExceptionForHR(propertyStore.Commit());
 
-        // Speichern
         var persistFile = (IPersistFile)shellLink;
         persistFile.Save(shortcutPath, true);
-
     }
 }
+#endif
