@@ -32,6 +32,7 @@ jobs:
 
       - name: Find version in commit messages
         id: ver
+        shell: bash    
         run: |
           # Lies die letzten 50 Commit-Messages vom Push
           msgs=$(git log --format=%B -n 50)
