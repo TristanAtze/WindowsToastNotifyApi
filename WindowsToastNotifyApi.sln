@@ -1,7 +1,6 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36414.22 d17.14
+VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsToastNotifyApi", "WindowsToastNotifyApi\WindowsToastNotifyApi.csproj", "{E03FB6A6-A9C7-4945-8681-3CCC3157CA91}"
 EndProject
@@ -9,6 +8,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotifyDemoApp", "NotifyDemo
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Projektmappenelemente", "Projektmappenelemente", "{84D27F74-D2BA-6C25-2661-968F101900D9}"
 	ProjectSection(SolutionItems) = preProject
+		.github\workflows\nuget-autopublish.yml = .github\workflows\nuget-autopublish.yml
 		README.md = README.md
 	EndProjectSection
 EndProject
@@ -39,5 +39,3 @@ Global
 		SolutionGuid = {5C1DD817-784A-46A4-BD2D-A577A5C62A5C}
 	EndGlobalSection
 EndGlobal
-
-

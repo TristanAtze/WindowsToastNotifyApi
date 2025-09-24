@@ -2,18 +2,19 @@ name: nuget-autopublish-on-commit
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
   contents: write
 
+env:
+  PROJECT_PATH: src/MyLib/MyLib.csproj  # <--- Pfad zu deinem .csproj
+
 jobs:
   publish:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -30,57 +31,50 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: "8.0.x"
 
       - name: Find version in commit messages
         id: ver
         run: |
-          msgs=$(jq -r '.commits[].message' < "$GITHUB_EVENT_PATH")
-          ver=""
-          while IFS= read -r line; do
-            if [[ "$line" =~ nuget:[[:space:]]*v?([0-9]+(\.[0-9]+){1,2}(-[0-9A-Za-z\.-]+)?(\+[0-9A-Za-z\.-]+)?) ]]; then
-              ver="${BASH_REMATCH[1]}"
-              break
-            fi
-          done <<< "$msgs"
-
-          if [[ -z "$ver" ]]; then
-            echo "found=false" >> "$GITHUB_OUTPUT"
+          msgs=$(jq -r '.commits[].message' "$GITHUB_EVENT_PATH")
+          ver=$(printf "%s\n" "$msgs" \
+            | grep -Eom1 'nuget:[[:space:]]*v?[0-9]+(\.[0-9]+){1,2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?' \
+            | sed -E 's/^nuget:[[:space:]]*v?//')
+          if [ -z "$ver" ]; then
+            echo "found=false" >>"$GITHUB_OUTPUT"
             echo "No version marker found (use 'nuget: 1.2.3')."
           else
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "version=$ver" >> "$GITHUB_OUTPUT"
+            echo "found=true" >>"$GITHUB_OUTPUT"
+            echo "version=$ver" >>"$GITHUB_OUTPUT"
             echo "Detected version: $ver"
           fi
 
       - name: Stop when no version was found
-        if: ${{ steps.ver.outputs.found != 'true' }}
-        run: echo "Skipping publish (no 'nuget: <version>' in commit messages)."
+        if: "${{ steps.ver.outputs.found != 'true' }}"
+        run: echo "No version marker found in commit messages. Skipping publish."
 
       - name: Restore
-        if: ${{ steps.ver.outputs.found == 'true' }}
+        if: "${{ steps.ver.outputs.found == 'true' }}"
         run: dotnet restore
 
       - name: Build
-        if: ${{ steps.ver.outputs.found == 'true' }}
+        if: "${{ steps.ver.outputs.found == 'true' }}"
         run: dotnet build -c Release --no-restore
 
       - name: Pack
-        if: ${{ steps.ver.outputs.found == 'true' }}
+        if: "${{ steps.ver.outputs.found == 'true' }}"
         run: |
-          mkdir -p artifacts
-          # CHANGE THIS to your csproj path
-          PROJECT="src/MyLib/MyLib.csproj"
-          if [[ ! -f "$PROJECT" ]]; then
-            echo "Project not found: $PROJECT" >&2
+          if [ ! -f "$PROJECT_PATH" ]; then
+            echo "Project not found: $PROJECT_PATH" >&2
             exit 1
           fi
-          dotnet pack "$PROJECT" -c Release --no-build \
+          mkdir -p artifacts
+          dotnet pack "$PROJECT_PATH" -c Release --no-build \
             -p:PackageVersion="${{ steps.ver.outputs.version }}" \
             -o ./artifacts
 
-      - name: Create & push git tag v<version>
-        if: ${{ steps.ver.outputs.found == 'true' }}
+      - name: Create & push git tag
+        if: "${{ steps.ver.outputs.found == 'true' }}"
         run: |
           TAG="v${{ steps.ver.outputs.version }}"
           if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -91,10 +85,10 @@ jobs:
           fi
 
       - name: Push package to nuget.org
-        if: ${{ steps.ver.outputs.found == 'true' }}
+        if: "${{ steps.ver.outputs.found == 'true' }}"
         run: |
-          shopt -s nullglob
           for pkg in artifacts/*.nupkg; do
+            [ -e "$pkg" ] || { echo "No .nupkg found in ./artifacts"; exit 1; }
             echo "Pushing $pkg ..."
             dotnet nuget push "$pkg" \
               --api-key "${{ secrets.NUGET_API_KEY }}" \
