@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WindowsToastNotifyApi.Tests\WindowsToastNotifyApi.Tests.csproj" />
     <ProjectReference Include="..\WindowsToastNotifyApi\WindowsToastNotifyApi.csproj" />
   </ItemGroup>
 

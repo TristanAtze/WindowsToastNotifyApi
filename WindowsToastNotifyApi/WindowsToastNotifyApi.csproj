@@ -10,9 +10,9 @@
     <IncludeSource>true</IncludeSource>
     <IsPackable>true</IsPackable>
 
-    <PackageId>MulNMNoftificationApiMultiPlatform</PackageId>
+    <PackageId>NotifyApiMultiPlatform</PackageId>
     <Authors>Ben Sowieja</Authors>
-    <Product>NotificationApiMultiPlatform</Product>
+    <Product>NotifyApiMultiPlatform</Product>
     <Description>Cross-platform toast &amp; local notification helper for .NET MAUI (Windows, Android, iOS, MacCatalyst) plus desktop Linux via notify-send fallback.</Description>
     <PackageTags>maui toast notifications windows android ios maccatalyst linux blazor hybrid</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
