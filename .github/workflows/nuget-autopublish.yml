@@ -12,6 +12,10 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash  # <<< wichtig: Bash überall nutzen
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +35,6 @@ jobs:
 
       - name: Find version in commit messages
         id: ver
-        shell: bash
         run: |
           msgs=$(jq -r '.commits[].message' < "$GITHUB_EVENT_PATH")
           ver=""
@@ -43,18 +46,17 @@ jobs:
           done <<< "$msgs"
 
           if [[ -z "$ver" ]]; then
-            echo "found=false" >> $GITHUB_OUTPUT
+            echo "found=false" >> "$GITHUB_OUTPUT"
             echo "No version marker found (use 'nuget: 1.2.3')."
           else
-            echo "found=true" >> $GITHUB_OUTPUT
-            echo "version=$ver" >> $GITHUB_OUTPUT
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "version=$ver" >> "$GITHUB_OUTPUT"
             echo "Detected version: $ver"
           fi
 
       - name: Stop when no version was found
         if: ${{ steps.ver.outputs.found != 'true' }}
-        run: |
-            echo "Skipping publish (no 'nuget: <version>' in commit messages)."
+        run: echo "Skipping publish (no 'nuget: <version>' in commit messages)."
 
       - name: Restore
         if: ${{ steps.ver.outputs.found == 'true' }}
@@ -64,13 +66,23 @@ jobs:
         if: ${{ steps.ver.outputs.found == 'true' }}
         run: dotnet build -c Release --no-restore
 
-      # Passe den Pfad ggf. auf dein .csproj an:
+      # Packt alle .csproj im Repo. Wenn du nur ein bestimmtes Projekt packen willst, ersetze die Schleife durch den Pfad zu deinem .csproj.
       - name: Pack
         if: ${{ steps.ver.outputs.found == 'true' }}
         run: |
-          dotnet pack -c Release --no-build \
-            -p:PackageVersion=${{ steps.ver.outputs.version }} \
-            -o ./artifacts .
+          mkdir -p artifacts
+          mapfile -t projects < <(git ls-files '*.csproj')
+          if [[ ${#projects[@]} -eq 0 ]]; then
+            echo "No .csproj files found in repository root." >&2
+            exit 1
+          fi
+
+          for p in "${projects[@]}"; do
+            echo "Packing $p ..."
+            dotnet pack "$p" -c Release --no-build \
+              -p:PackageVersion="${{ steps.ver.outputs.version }}" \
+              -o ./artifacts
+          done
 
       - name: Create & push git tag v<version>
         if: ${{ steps.ver.outputs.found == 'true' }}
@@ -86,7 +98,16 @@ jobs:
       - name: Push package to nuget.org
         if: ${{ steps.ver.outputs.found == 'true' }}
         run: |
-          dotnet nuget push "artifacts/*.nupkg" \
-            --api-key "${{ secrets.NUGET_API_KEY }}" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          shopt -s nullglob
+          files=(artifacts/*.nupkg)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No .nupkg found in ./artifacts" >&2
+            exit 1
+          fi
+          for pkg in "${files[@]}"; do
+            echo "Pushing $pkg ..."
+            dotnet nuget push "$pkg" \
+              --api-key "${{ secrets.NUGET_API_KEY }}" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
