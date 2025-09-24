@@ -49,6 +49,7 @@ jobs:
             echo "Detected version: $ver"
           fi
 
+
       - name: Stop when no version was found
         if: "${{ steps.ver.outputs.found != 'true' }}"
         run: echo "No version marker found in commit messages. Skipping publish."
