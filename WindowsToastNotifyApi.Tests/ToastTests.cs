@@ -31,7 +31,6 @@ public sealed class ToastTests : IDisposable
     public void Initialize_SetsMetadataAndIsInitialized()
     {
         Toast.Initialize("com.acme.app", "Acme", iconPath: "/tmp/icon");
-
         Assert.True(Toast.IsInitialized);
         Assert.Equal("com.acme.app", GetStaticProperty<string?>("AppId"));
         Assert.Equal("Acme", GetStaticProperty<string?>("DisplayName"));
